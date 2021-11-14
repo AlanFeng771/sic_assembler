@@ -1,3 +1,4 @@
+import numpy as np
 LOCCTR = 0
 starting_address = 0
 tot_size = 0
@@ -86,6 +87,16 @@ list_file = open('output.txt', 'w')
 
 # open objectcode.txt
 object_program = open('objectcode.txt', 'w')
+
+# update part of string
+def update_str(source, target, start=0, end=0):
+    sour = list(source)
+    tar = list(target)
+    range = np.arange(start, end+1)
+    for i, item in enumerate(range):
+        sour[item] = tar[i]
+    
+    return ''.join(sour)
 
 ### PASS2
 with open('loc.txt', 'r') as loc_file:
@@ -177,12 +188,9 @@ with open('loc.txt', 'r') as loc_file:
         # check Is text record's length over max length 1/output Text record and new Text record
         if text_len+(len(object_code)/2)>30:
             # update Text record's LEN
-            program_text = list(program_text)
             size = hex(int(len(program_text[9:])/2))[2:]
-            program_text[7] = size[0]
-            program_text[8] = size[1]
-            program_text = ''.join(program_text)
-
+            program_text = update_str(program_text, size, 7, 8)
+            
             # out Text record
             object_program.write(program_text+'\n')   
 
@@ -197,18 +205,17 @@ with open('loc.txt', 'r') as loc_file:
             program_text += object_code
 
         else:
+            # check trailing object code is empty 1/new line, 0/output Text record
             if not Isempty:
-                program_text = list(program_text)
                 size = hex(int(len(program_text[9:])/2))[2:]
                 if len(size) == 2:
-                    program_text[7] = size[0]
-                    program_text[8] = size[1]
+                    program_text = update_str(program_text, size, 7, 8)
                 else:
-                    program_text[7] = '0'
-                    program_text[8] = size[0]
-                program_text = ''.join(program_text)
+                    program_text = update_str(program_text, '0'+size, 7, 8)
+
                 object_program.write(program_text+'\n')
                 Isempty = True
+            
             text_len = 0
 
         # END

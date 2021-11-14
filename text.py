@@ -8,7 +8,7 @@ str = 'abc'
 for i in str:
     print(i)
 
-s = f'123'
-s = list(s)
+s = '123'
+# s = list(s)
 s[0] = '2'
 print(s[0])
