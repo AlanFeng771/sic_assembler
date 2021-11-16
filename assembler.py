@@ -1,3 +1,4 @@
+
 import numpy as np
 LOCCTR = 0
 starting_address = 0
@@ -16,26 +17,26 @@ loc_file = open('loc.txt', 'w')
 
 ### PASS1
 with open('input.txt', 'r') as file:
+    data = []
+    text = file.readline()
+    text = text.replace('\n', '')       # avoid '/n'
+
+    data.append(text[0:6])              # LABEL
+    data[0] = data[0].replace(' ', '')  # opcode, operand
+    data += text[6:].split('\t')
+
+    # START
+    if data[1] == 'START':
+        starting_address = int(f'0x{data[2]}', 16)
+        LOCCTR = starting_address
+        loc_file.writelines(f'{hex(starting_address)[2:]}\t{text}\n')
+
     while(1):
         # preprocess data
-        data = []
         text = file.readline()
-        text = text.replace('\n', '')    # avoid '/n'
+        text = text.replace('\n', '')   # avoid '/n'
 
-        data.append(text[0:6])           # LABEL
-        data[0] = data[0].replace(' ', '')
-
-        data.append(text[8:14])          # OPCODE
-        data[1] = data[1].replace(' ', '')
-
-        data.append(text[14:])           # OPERAND
-        
-        # START
-        if data[1] == 'START':
-            starting_address = int(f'0x{data[2]}', 16)
-            LOCCTR = starting_address
-            loc_file.writelines(f'{hex(starting_address)[2:]} {text}\n')
-            continue
+        data = text.split('\t')         # LABEL, OPCODE, OPERAND
         
         # check is symbol exit in symbol table 1/show error, 0/insert in symbol table  
         if data[0]!='':
@@ -45,42 +46,44 @@ with open('input.txt', 'r') as file:
                 SYMTAB.update({data[0]:hex(LOCCTR)})
         
         # output loc.txt
-        loc_file.writelines(f'{LOCCTR:x} {text}\n')
+        loc_file.writelines(f'{LOCCTR:x}\t{text}\n')
 
         ## move loc counter
-        # normal opcode
-        if OPTAB.get(data[1]) != None:
-            LOCCTR += 3
+        # check Is not a comment line 0/don't do anything 
+        if data[0] != '.':
+            # normal opcode
+            if OPTAB.get(data[1]) != None:
+                LOCCTR += 3
 
-        # assembler directive
-        elif data[1] == 'WORD':
-            LOCCTR += 3
+            # assembler directive
+            elif data[1] == 'WORD':
+                LOCCTR += 3
 
-        elif data[1] == 'RESW':
-            LOCCTR += 3*int(data[2])
+            elif data[1] == 'RESW':
+                LOCCTR += 3*int(data[2])
 
-        elif data[1] == 'RESB':
-            LOCCTR += int(data[2])
+            elif data[1] == 'RESB':
+                LOCCTR += int(data[2])
 
-        elif data[1] == 'BYTE':
-            type = data[2][0]                      # c(charactor)/x(hex number)
-            value = data[2][1:].replace('\'', '')  # 'value' -> value
+            elif data[1] == 'BYTE':
+                type = data[2][0]                      # c(charactor)/x(hex number)
+                value = data[2][1:].replace('\'', '')  # 'value' -> value
 
-            if type == 'X':
-                LOCCTR += int(len(value)/2)
-            if type == 'C':
-                LOCCTR += len(value)
+                if type == 'X':
+                    LOCCTR += int(len(value)/2)
+                if type == 'C':
+                    LOCCTR += len(value)
 
-        # END
-        elif data[1] == 'END':
-            tot_size = LOCCTR-starting_address
+            # END
+            elif data[1] == 'END':
+                tot_size = LOCCTR-starting_address
 
-            loc_file.writelines(f'{hex(LOCCTR)[2:]} {text}\n')
-            loc_file.close()
-            break
+                loc_file.writelines(f'{hex(LOCCTR)[2:]}\t{text}\n')
+                loc_file.close()
+                break
 
-        else:
-            print('[error] : invalid operation code')
+            else:
+                print('[error] : invalid operation code')
 
 # open output.txt         
 list_file = open('output.txt', 'w')
@@ -124,106 +127,120 @@ with open('loc.txt', 'r') as loc_file:
     # init first record
     text_len = 0        # LEN
     program_text = ''   # Text record
-    Isempty = False       # jump black block
+    Isempty = False     # jump black block
+    i = 0
 
+    data = []
+    text = loc_file.readline()
+    text = text.replace('\n', '')    # avoid '/n'
+
+    data.append(text.split('\t')[0])           # LOC
+
+    data.append(text.split('\t')[1][0:6])      # LABEL
+
+    data.append(text.split('\t')[1][6:])       # OPCODE
+
+    data.append(text.split('\t')[2])           # OPERAND
+    print(data)
+    # START
+    if data[2] == 'START':
+        list_file.writelines(f'{text}\n')                                            #  output listing line
+        object_program.write(f'H{data[1]:6s}{starting_address:06x}{tot_size:06x}\n') #  output Header record
+            
     while(1):
         # preprocess data
         data = []
         text = loc_file.readline()
         text = text.replace('\n', '')    # avoid '/n'
 
-        data.append(text[0:4])           # LOC
-
-        data.append(text[5:11])          # LABEL
-        data[1] = data[1].replace(' ', '')
-
-        data.append(text[13:19])         # OPCODE
-        data[2] = data[2].replace(' ', '')
-
-        data.append(text[19:])           # OPERAND
-
+        data = text.split('\t')          # LOC, LABEL, OPCODE, OPERAND
         ## create object code
         # init object_code
         object_code = ''
+        if data[1] != '.':
+            if len(data) == 3:
+                data.append('')
 
-        # START
-        if data[2] == 'START':
-            list_file.writelines(f'{text}\n')                                            #  output listing line
-            object_program.write(f'H{data[1]:6s}{starting_address:06x}{tot_size:06x}\n') #  output Header record
-            continue
-        # normal opcode
-        if OPTAB.get(data[2]) != None:
-            opcode = data[2]
-            operand = data[3].split(',')[0]  # avoid ,X
-
-            # check Is operand -> None 1/set(0000)
-            if(operand !=' '):
-                object_code = OPTAB[opcode]+SYMTAB[operand][2:]
-            else:
-                object_code = OPTAB[opcode]+'0000'
-        
-        # assembler directive   
-        elif data[2] == 'WORD':
-            object_code = f'{int(data[3]):06x}'
-
-        elif data[2] == 'BYTE':
-            type = data[3][0]                       # c(charactor)/x(hex number)
-            value = data[3][1:].replace('\'', '')   # 'value' -> value
-
-            if type == 'X':
-                object_code = value
-            if type == 'C':
-                # char -> ascii
-                asic = ''   
-                for item in value:
-                    asic +=  hex(ord(item))[2:]
-                object_code = asic
+            # normal opcode
+            if OPTAB.get(data[2]) != None:
+                opcode = data[2]
+                operand = data[3].split(',')[0]  # avoid ,X
+                is_x = False
+                if data[3].split(',')[-1] == 'X':
+                    is_x = True
             
-        list_file.writelines(f'{text} {object_code}\n')
-
-        ## create object program
-        if text_len == 0:
-            program_text = f'T00{data[0]}__'         # new Text record
-
-        # check Is text record's length over max length 1/output Text record and new Text record
-        if text_len+(len(object_code)/2)>30:
-            # update Text record's LEN
-            size = hex(int(len(program_text[9:])/2))[2:]
-            program_text = update_str(program_text, size, 7, 8)
-            
-            # out Text record
-            object_program.write(program_text+'\n')   
-
-            # new Text record
-            program_text = f'T00{data[0]}__'          
-            text_len = 0
-        
-        # trailing object code
-        if object_code!='':
-            Isempty = False
-            text_len += int(len(object_code)/2)
-            program_text += object_code
-
-        else:
-            # check trailing object code is empty 1/new line, 0/output Text record
-            if not Isempty:
-                size = hex(int(len(program_text[9:])/2))[2:]
-                if len(size) == 2:
-                    program_text = update_str(program_text, size, 7, 8)
+                # check Is operand -> None 1/set(0000)
+                if(operand !=''):
+                    if not is_x:
+                        object_code = OPTAB[opcode]+SYMTAB[operand][2:]
+                    else:
+                        operand_x = hex(0x8 + int(SYMTAB[operand][2], 16))[2:]+SYMTAB[operand][3:]
+                        object_code = OPTAB[opcode]+operand_x
                 else:
-                    program_text = update_str(program_text, '0'+size, 7, 8)
+                    object_code = OPTAB[opcode]+'0000'
+        
+            # assembler directive   
+            elif data[2] == 'WORD':
+                object_code = f'{int(data[3]):06x}'
 
-                object_program.write(program_text+'\n')
-                Isempty = True
+            elif data[2] == 'BYTE':
+                type = data[3][0]                       # c(charactor)/x(hex number)
+                value = data[3][1:].replace('\'', '')   # 'value' -> value
+
+                if type == 'X':
+                    object_code = value
+                if type == 'C':
+                    # char -> ascii
+                    asic = ''   
+                    for item in value:
+                        asic +=  hex(ord(item))[2:]
+                    object_code = asic
             
-            text_len = 0
+            list_file.writelines(f'{text} {object_code}\n')
 
-        # END
-        if data[2] == 'END':
-            object_program.write(f'E00{SYMTAB[data[3]][2:]}')
-            object_program.close()
-            list_file.close()
-            break
+            ## create object program
+            if text_len == 0:
+                program_text = f'T00{data[0]}__'         # new Text record
+
+            # check Is text record's length over max length 1/output Text record and new Text record
+            if text_len+(len(object_code)/2)>30:
+                # update Text record's LEN
+                size = hex(int(len(program_text[9:])/2))[2:]
+                program_text = update_str(program_text, size, 7, 8)
+            
+                # out Text record
+                object_program.write(program_text+'\n')   
+
+                # new Text record
+                program_text = f'T00{data[0]}__'          
+                text_len = 0
+        
+            # trailing object code
+            if object_code!='':
+                Isempty = False
+                text_len += int(len(object_code)/2)
+                program_text += object_code
+
+            else:
+                # check trailing object code is empty 1/new line, 0/output Text record
+                if not Isempty:
+                    size = hex(int(len(program_text[9:])/2))[2:]
+                    if len(size) == 2:
+                        program_text = update_str(program_text, size, 7, 8)
+                    else:
+                        program_text = update_str(program_text, '0'+size, 7, 8)
+
+                    object_program.write(program_text+'\n')
+                    Isempty = True
+            
+                text_len = 0
+
+            # END
+            if data[2] == 'END':
+                object_program.write(f'E00{SYMTAB[data[3]][2:]}')
+                object_program.close()
+                list_file.close()
+                break
         
         
 
