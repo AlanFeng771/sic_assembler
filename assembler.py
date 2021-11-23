@@ -157,7 +157,10 @@ with open('loc.txt', 'r') as loc_file:
         ## create object code
         # init object_code
         object_code = ''
+
+        #check IS not a comment line
         if data[1] != '.':
+            # data's shape align
             if len(data) == 3:
                 data.append('')
 
